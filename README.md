@@ -8,7 +8,9 @@ This toolbox was written by Dr. Mitchell Harley at the University of New South W
 
 2.  Download the MATLAB files of this GitHub site to the CoastSnap/Code directory
 
-3.  Update the following two files to match your local setup: CSPsetPaths.m and CSPloadPaths.m
+3.  Make sure you have the following Matlab toolkits installed: mapping toolbox, Statistics and ML toolbox, Image processing toolbox
+
+4.  Update the following two files to match your local setup: CSPsetPaths.m and CSPloadPaths.m
 
 Thats all - you should now be up and running
 
