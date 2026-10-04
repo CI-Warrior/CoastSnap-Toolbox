@@ -39,3 +39,31 @@ All new images from various the sources (e.g. Instagram, Facebook, Email) are to
 ## CoastSnap GUI
 
 
+
+## Python port (work in progress)
+
+The `coastsnap` Python package is a port of this toolbox. So far it covers image rectification: the camera model and lens distortion from `rectifyCode/`, the GCP solve with the FOV sweep from `CSPGrectifyImage`, and plan-view products from `buildRectProducts`/`makeFinalImages`.
+
+```bash
+pip install -e ".[db,gui,test]"
+pytest
+```
+
+```python
+from PIL import Image
+import numpy as np
+from coastsnap.db import read_site_db
+from coastsnap.rectify import RectificationSettings, rectify_from_gcps, rectified_paths, save_rectified
+from coastsnap.interactive import pick_gcps
+
+settings = RectificationSettings.from_site_db(read_site_db("Database/CoastSnapDB.xlsx", "manly"))
+img = np.asarray(Image.open(image_path))
+uv = pick_gcps(img, [g.name for g in settings.selected_gcps()])
+result = rectify_from_gcps(img, uv, settings, tide_level=0.4)
+print(result.geometry.rmse, result.geometry.fov_deg)
+save_rectified(result, *rectified_paths(image_path))   # same .jpg/.mat layout as MATLAB
+```
+
+**Wide-angle lenses.** The MATLAB code assumes a distortion-free phone camera and tabulates distortion only out to about 56° off-axis, so ultra-wide images lose their edges. The Python port evaluates the lens model directly (`LensCalibration(model="analytic")`, the default) and can either use a known calibration (`LensCalibration.from_opencv(K, dist, (width, height))`) or fit the distortion from the GCPs: `rectify_from_gcps(..., refine_focal=True, free_distortion=("d1", "d2"))`, adding `"c0u", "c0v"` if the principal point is off-centre. Fitting distortion needs more GCPs, spread out towards the image edges. `model="table"` reproduces MATLAB exactly.
+
+The tests compare against outputs of the original MATLAB code, regenerated with `octave --no-gui -q tests/matlab_reference/make_reference.m`.
