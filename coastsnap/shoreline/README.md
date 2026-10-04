@@ -40,8 +40,9 @@ Pass `--review` to `map` to check each image as it is mapped instead.
 The saved `UV` column (shoreline in oblique-image pixels) needs the camera
 geometry. Pass a `project_uv(xyz) -> uv` callable to `make_record`,
 `review_shoreline` or `review_queue` (the review window then also draws the
-shoreline on the oblique image). Until the rectification port provides one,
-the CLI writes NaN for `UV`.
+shoreline on the oblique image). The CLI uses
+`coastsnap.camera.make_uv_projector(metadata["geom"])` from the rectification
+port when it is installed, and writes NaN for `UV` otherwise.
 
 ## Differences from the MATLAB code
 

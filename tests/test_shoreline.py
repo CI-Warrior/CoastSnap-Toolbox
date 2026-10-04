@@ -307,3 +307,24 @@ def test_cli_map_then_review_marks_qa(tmp_path, monkeypatch):
     monkeypatch.setattr(ShorelineReviewer, "run", lambda self: (self.editor.reject(), REJECTED)[1])
     assert cli.main([*review, "--all"]) == 0
     assert load_shoreline(out).qa is True
+
+
+def test_cli_uses_camera_projector_when_available(tmp_path, monkeypatch):
+    import sys
+    import types
+
+    fake = types.ModuleType("coastsnap.camera")
+    fake.make_uv_projector = lambda geom: (lambda xyz: xyz[:, :2] * geom["scale"])
+    monkeypatch.setitem(sys.modules, "coastsnap.camera", fake)
+
+    x, y, img = synthetic_plan()
+    t = transects()
+    plan_name = FNAME.replace(".snap.", ".plan.").replace(".jpg", ".mat")
+    savemat(tmp_path / plan_name, {"xgrid": x, "ygrid": y, "Iplan": img,
+                                   "metadata": {"rectz": 0.4, "geom": {"scale": 2.0}}})
+    tfile = tmp_path / "SLtransects.mat"
+    savemat(tfile, {"SLtransects": {"x": t.x, "y": t.y}})
+    cli.main(["map", str(tmp_path / plan_name), "--transects", str(tfile),
+              "--shoreline-root", str(tmp_path / "S"), "--origin", "0", "0", "--utm-zone", "56H"])
+    rec = load_shoreline(shoreline_path_for(tmp_path / "S", plan_name))
+    np.testing.assert_allclose(rec.uv, rec.xyz[:, :2] * 2)

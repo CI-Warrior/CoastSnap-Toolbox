@@ -24,6 +24,20 @@ from .review import ACCEPTED, QueueItem, review_queue, review_shoreline, unrevie
 from .transects import load_transects
 
 
+def uv_projector(metadata):
+    """Camera projection for a plan image's geometry, or None.
+
+    Uses ``coastsnap.camera.make_uv_projector`` from the rectification port
+    when it is installed and the metadata carries a ``geom``.
+    """
+    try:
+        from coastsnap.camera import make_uv_projector
+    except ImportError:
+        return None
+    geom = metadata.get("geom") if isinstance(metadata, dict) else None
+    return make_uv_projector(geom) if geom is not None else None
+
+
 def _common(p):
     p.add_argument("--transects", required=True, type=Path, help="site SLtransects .mat file")
     p.add_argument("--shoreline-root", required=True, type=Path, help="the Shorelines folder")
@@ -66,7 +80,8 @@ def cmd_map(args) -> int:
         plan = load_plan(plan_path)
         if args.review:
             out = review_shoreline(plan, transects, origin, args.utm_zone, save_to=out_path,
-                                   method=args.method, title=plan_path.name)
+                                   method=args.method, project_uv=uv_projector(plan.metadata),
+                                   title=plan_path.name)
             print(prefix, out.decision + (f" -> {out.path}" if out.path else ""))
             continue
         result = map_shoreline(plan.xgrid, plan.ygrid, plan.iplan, transects, method=args.method)
@@ -74,7 +89,7 @@ def cmd_map(args) -> int:
             print(prefix, "no shoreline found")
             continue
         record = make_record(result.xy, plan.rectz, origin, args.utm_zone,
-                             result.method, result.threshold, qa=False)
+                             result.method, result.threshold, uv_projector(plan.metadata), qa=False)
         save_shoreline(out_path, record)
         print(prefix, f"{len(result.xy)} points, threshold {result.threshold:.3g} -> {out_path} (unreviewed)")
     return 0
@@ -101,6 +116,7 @@ def cmd_review(args) -> int:
         return 0
     print(f"Reviewing {len(items)} shoreline(s).")
     results = review_queue(items, load_transects(args.transects), tuple(args.origin), args.utm_zone,
+                           project_uv_for=lambda item: uv_projector(load_plan(item.plan_path).metadata),
                            on_reject="delete" if args.delete_rejected else "keep")
     accepted = sum(d == ACCEPTED for _, d in results)
     print(f"{accepted} accepted, {len(results) - accepted} rejected or skipped.")
