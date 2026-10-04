@@ -12,7 +12,17 @@ from .io import (
     shoreline_path_for,
 )
 from .review import ShorelineEditor, review_queue, review_shoreline
-from .transects import Transects, beach_width, beach_width_trend, load_transects, transect_chainage
+from .transects import (
+    Transects,
+    beach_width,
+    beach_width_trend,
+    load_transects,
+    make_transects,
+    save_transects,
+    shift_shoreline,
+    transect_chainage,
+    water_level_shift,
+)
 
 __all__ = [
     "PlanImage",
@@ -27,12 +37,16 @@ __all__ = [
     "load_shoreline",
     "load_transects",
     "make_record",
+    "make_transects",
     "map_shoreline",
     "map_shoreline_ccd",
     "map_shoreline_hue",
     "review_queue",
     "review_shoreline",
     "save_shoreline",
+    "save_transects",
     "shoreline_path_for",
+    "shift_shoreline",
     "transect_chainage",
+    "water_level_shift",
 ]

@@ -60,8 +60,7 @@ port when it is installed, and writes NaN for `UV` otherwise.
   five, so HUE never worked from the GUI. It works here.
 - `CSPGqaShoreline.m` called the deleted `CSPgetGCPcombo` and was broken; QA is
   now the accept step of the reviewer.
-- Trend and change figures (layout, logo, captions) are not ported yet; their
-  numbers come from `transects.py`.
+- The trend, change, forecast and animation figures are in `coastsnap.plots`.
 
 ## Tests
 

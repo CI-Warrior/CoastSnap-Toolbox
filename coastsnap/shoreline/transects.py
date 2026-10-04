@@ -139,3 +139,100 @@ def _segment_hits(p, q, a, b):
         u = (ap[:, 0] * r[1] - ap[:, 1] * r[0]) / denom
     ok = (denom != 0) & (t >= 0) & (t <= 1) & (u >= 0) & (u <= 1)
     return t[ok]
+
+
+def shift_shoreline(shoreline_xyz, transects: Transects, shift, z=None, extend: float = 1.0) -> np.ndarray:
+    """Move a shoreline along the transects (port of ``CSPGshiftSLxshore``).
+
+    Returns one point per transect the shoreline crosses, moved ``shift``
+    metres seaward (towards each transect's end; negative is landward).
+    ``shift`` may be a scalar or one value per transect. The points take
+    elevation ``z`` (default: the shoreline's own).
+
+    MATLAB moves points towards +x along a line fitted to the transect, so
+    the sign of the shift depends on which way the beach faces and vertical
+    transects fail; this works along the transect direction instead.
+    """
+    xyz = np.asarray(shoreline_xyz, dtype=float)
+    chain = transect_chainage(xyz[:, :2], transects, extend=extend)
+    start = np.vstack([transects.x[0], transects.y[0]]).T
+    vec = np.vstack([transects.x[1] - transects.x[0], transects.y[1] - transects.y[0]]).T
+    unit = vec / np.linalg.norm(vec, axis=1, keepdims=True)
+    pts = start + (chain + np.broadcast_to(np.asarray(shift, dtype=float), chain.shape))[:, None] * unit
+    z = xyz[0, 2] if z is None else z
+    out = np.column_stack([pts, np.full(len(pts), float(z))])
+    return out[~np.isnan(chain)]
+
+
+def water_level_shift(shoreline_z, water_level, beach_slope):
+    """Seaward shift (m) that moves a shoreline at ``shoreline_z`` to ``water_level``.
+
+    A higher water level moves the shoreline landward, so this is
+    ``-(water_level - shoreline_z) / beach_slope``.
+    """
+    return -tidal_correction(shoreline_z, water_level, beach_slope)
+
+
+def make_transects(roi, coastline, spacing: float = 5.0, half_length: float = 500.0,
+                   step: float = 0.1, flip: bool = False) -> Transects:
+    """Build shore-normal transects (the Make Transect File tool, CSPGmakeTransectFiles).
+
+    Parameters
+    ----------
+    roi : (P, 2) polygon spanning sand and water, where shorelines may be found.
+    coastline : (Q, 2) polyline roughly along the shore, drawn from the end
+        nearest the camera.
+    spacing : distance between transects along ``coastline`` (m).
+    flip : swap start and end. Transects run towards +x (towards +y when the
+        coastline runs east-west), so flip when that points landward: the
+        start must be the landward end.
+
+    Transects are clipped to the part of each normal line inside ``roi``;
+    normals that miss it are dropped. ``alongshore_distances`` are the
+    distances of the kept transects along the coastline.
+    """
+    from matplotlib.path import Path as MplPath
+
+    pts = np.asarray(coastline, dtype=float)[:, :2]
+    seg = np.hypot(*np.diff(pts, axis=0).T)
+    dist = np.concatenate([[0.0], np.cumsum(seg)])
+    locs = _colon(0.0, spacing, dist[-1])
+    mx = np.interp(locs, dist, pts[:, 0])
+    my = np.interp(locs, dist, pts[:, 1])
+    d = np.arange(-half_length, half_length + step / 2, step)
+    roi_path = MplPath(np.asarray(roi, dtype=float)[:, :2])
+    starts, ends, along = [], [], []
+    for i in range(len(locs) - 1):
+        tx, ty = mx[i + 1] - mx[i], my[i + 1] - my[i]
+        n = np.array([ty, -tx]) / np.hypot(tx, ty)
+        if n[0] < 0 or (n[0] == 0 and n[1] < 0):
+            n = -n
+        line = np.column_stack([mx[i] + d * n[0], my[i] + d * n[1]])
+        inside = np.flatnonzero(roi_path.contains_points(line))
+        if inside.size:
+            starts.append(line[inside[0]])
+            ends.append(line[inside[-1]])
+            along.append(locs[i])
+    if not starts:
+        raise ValueError("no transect crosses the region of interest")
+    a, b = np.array(starts), np.array(ends)
+    if flip:
+        a, b = b, a
+    return Transects(np.vstack([a[:, 0], b[:, 0]]), np.vstack([a[:, 1], b[:, 1]]), np.array(along))
+
+
+def _colon(lo, step, hi):
+    """MATLAB ``lo:step:hi``."""
+    n = int(np.floor((hi - lo) / step + 1e-10)) + 1
+    return lo + step * np.arange(max(n, 0))
+
+
+def save_transects(path, transects: Transects):
+    """Save as the ``SLtransects`` struct the MATLAB toolbox reads."""
+    from scipy.io import savemat
+
+    sl = {"x": transects.x, "y": transects.y}
+    if transects.alongshore_distances is not None:
+        sl["alongshore_distances"] = transects.alongshore_distances[None, :]
+    savemat(path, {"SLtransects": sl})
+    return path

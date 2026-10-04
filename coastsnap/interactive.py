@@ -28,3 +28,33 @@ def pick_gcps(image, names, title_prefix="Digitize"):
         ax.plot(u, v, "go", markersize=3)
         uv.append((u, v))
     return np.array(uv)
+
+
+def draw_polyline(ax, prompt: str, closed: bool = False):
+    """Click points on ``ax``; Enter (or a right click) finishes. Returns (K, 2)."""
+    import matplotlib.pyplot as plt
+
+    ax.set_title(prompt + " (click points, Enter to finish)")
+    ax.figure.canvas.draw()
+    pts = np.array(plt.ginput(n=-1, timeout=0, mouse_add=1, mouse_pop=3, mouse_stop=2))
+    if len(pts):
+        loop = np.vstack([pts, pts[:1]]) if closed else pts
+        ax.plot(loop[:, 0], loop[:, 1], "g-" if not closed else "c-")
+    return pts
+
+
+def draw_transect_inputs(plan_x, plan_y, plan_image):
+    """The two drawings the Make Transect File tool asks for, on a plan image.
+
+    Returns ``(roi, coastline)`` in local coordinates for
+    :func:`coastsnap.shoreline.make_transects`.
+    """
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots()
+    ax.imshow(plan_image, origin="lower", extent=(plan_x[0], plan_x[-1], plan_y[0], plan_y[-1]))
+    ax.set_xlabel("Eastings [m]")
+    ax.set_ylabel("Northings [m]")
+    roi = draw_polyline(ax, "Draw region of interest, equally between sand/water", closed=True)
+    coastline = draw_polyline(ax, "Draw representative shoreline (starting from nearest station)")
+    return fig, ax, roi, coastline

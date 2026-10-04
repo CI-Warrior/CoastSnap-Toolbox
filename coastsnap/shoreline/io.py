@@ -19,6 +19,8 @@ from typing import Callable
 import numpy as np
 from scipy.io import loadmat, savemat
 
+from ..naming import parse_filename, shoreline_name
+
 #: Maps local (x, y, z) points (K, 3) to image (U, V) pixels (K, 2). The
 #: rectification module provides this from the camera geometry
 #: (``findUVnDOF`` in MATLAB).
@@ -108,10 +110,27 @@ def make_record(
     return ShorelineRecord(xyz, utm, utm_zone, uv, method, threshold, qa)
 
 
-def save_shoreline(path, record: ShorelineRecord) -> Path:
+def save_shoreline(path, record: ShorelineRecord, csv: bool | None = None) -> Path:
+    """Save the ``sl`` struct, plus a CSV of UTM points for reviewed shorelines.
+
+    ``CSPGsaveShoreline`` writes ``<name>.csv`` (Eastings, Northings,
+    Elevation to 2 decimals) next to the ``.mat`` when a person saves a
+    shoreline. ``csv=None`` does the same: a CSV for reviewed (QA) records only.
+    """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     savemat(path, {"sl": record.to_mat_struct()})
+    if record.qa if csv is None else csv:
+        save_shoreline_csv(path.with_suffix(".csv"), record)
+    return path
+
+
+def save_shoreline_csv(path, record: ShorelineRecord) -> Path:
+    path = Path(path)
+    with open(path, "w", newline="") as f:
+        f.write("Eastings,Northings,Elevation\r\n")
+        for e, n, z in np.asarray(record.utm, dtype=float).reshape(-1, 3):
+            f.write(f"{e:0.2f},{n:0.2f},{z:0.2f}\r\n")
     return path
 
 
@@ -149,37 +168,9 @@ def load_plan(path) -> PlanImage:
 # --------------------------------------------------------------------------
 
 
-def parse_filename(fname: str) -> dict:
-    """Split a CoastSnap/Argus filename into parts (port of ``CSPparseFilename``).
-
-    ``1528322400.Thu.Jun.07_08_00_00.AEST.2018.manly.snap.Mitch.jpg``
-    """
-    c = Path(fname).name.split(".")
-    if len(c) < 10:
-        raise ValueError(f"{fname!r} is not a CoastSnap filename")
-    return {
-        "epochtime": c[0],
-        "dayname": c[1],
-        "month": c[2],
-        "day": c[3][0:2],
-        "hour": c[3][3:5],
-        "min": c[3][6:8],
-        "sec": c[3][9:11],
-        "timezone": c[4],
-        "year": c[5],
-        "site": c[6],
-        "type": c[7],
-        "user": c[8],
-        "format": c[9],
-    }
-
-
 def shoreline_filename(image_name: str) -> str:
     """Shoreline ``.mat`` name for an image (snap/timex/plan, .jpg or .mat)."""
-    name = Path(image_name).name
-    for kind in ("snap", "timex", "plan"):
-        name = name.replace(f".{kind}.", ".shoreline.")
-    return str(Path(name).with_suffix(".mat"))
+    return shoreline_name(image_name, ".mat")
 
 
 def shoreline_path_for(shoreline_root, image_name: str) -> Path:

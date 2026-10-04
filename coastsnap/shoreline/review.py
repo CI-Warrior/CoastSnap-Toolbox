@@ -486,6 +486,7 @@ def review_queue(
         )
         if out.decision == REJECTED and on_reject == "delete":
             item.shoreline_path.unlink()
+            item.shoreline_path.with_suffix(".csv").unlink(missing_ok=True)
         results.append((item, out.decision))
     return results
 

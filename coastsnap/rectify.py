@@ -14,9 +14,10 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from .camera.geometry import find_uv
+from .camera.geometry import find_uv, find_xyz_6dof
 from .camera.lens import LensCalibration, make_lcp
 from .camera.solve import Geometry, solve_geometry
+from .naming import plan_name, rectified_dir
 
 # MATLAB rgb2gray weights.
 _GRAY = np.array([0.298936021293775, 0.587043074451121, 0.114020904255103])
@@ -157,6 +158,7 @@ class RectificationSettings:
     fov_limits: tuple = None    # (min, max) horizontal FOV in degrees
     gcps: list = field(default_factory=list)
     gcp_combo: list = None      # 1-based indices into gcps, as in the DB
+    accuracy_limit: float = None  # largest acceptable GCP RMSE in pixels
 
     @classmethod
     def from_site_db(cls, site: dict) -> "RectificationSettings":
@@ -174,6 +176,7 @@ class RectificationSettings:
             fov_limits=tuple(rect["FOVlims"]) if rect.get("FOVlims") is not None else None,
             gcps=[GCP(**g) for g in site.get("gcp", [])],
             gcp_combo=site.get("gcp_combo"),
+            accuracy_limit=rect.get("accuracylim"),
         )
 
     @property
@@ -190,6 +193,11 @@ class RectificationSettings:
         if not self.gcp_combo:
             return list(self.gcps)
         return [self.gcps[i - 1] for i in np.atleast_1d(self.gcp_combo)]
+
+    def unused_gcps(self) -> list:
+        """GCPs not in the combo, which CSPGrectifyImage projects as an accuracy check."""
+        used = {id(g) for g in self.selected_gcps()}
+        return [g for g in self.gcps if id(g) not in used]
 
     def gcp_xyz(self, gcps=None) -> np.ndarray:
         """GCP coordinates in the local frame (origin subtracted)."""
@@ -252,15 +260,39 @@ def rectified_paths(image_path: str) -> tuple[str, str]:
     """Plan ``.jpg`` and ``.mat`` paths for an oblique image, following the
     MATLAB naming (``Processed``/``Registered`` to ``Rectified``, ``snap``/``timex``
     to ``plan``)."""
-    folder, name = os.path.split(image_path)
-    folder = folder.replace("Processed", "Rectified").replace("Registered", "Rectified")
-    name = name.replace("snap", "plan").replace("timex", "plan")
-    jpg = os.path.join(folder, name)
+    folder = rectified_dir(os.path.dirname(image_path) or ".")
+    jpg = os.path.join(str(folder), plan_name(os.path.basename(image_path), ".jpg"))
     return jpg, os.path.splitext(jpg)[0] + ".mat"
 
 
-def save_rectified(result: RectificationResult, jpg_path: str, mat_path: str = None):
-    """Write the plan image and a MATLAB-readable ``.mat`` (xgrid, ygrid, Iplan, metadata)."""
+def world_file(x, y, res: float, origin=(0.0, 0.0)) -> np.ndarray:
+    """The six world-file values for a plan image saved north-up.
+
+    ``[res, 0, 0, -res, west, north]`` where (west, north) is the centre of
+    the top-left pixel in real-world (UTM) coordinates, as CSPGrectifyImage
+    writes it.
+    """
+    return np.array([res, 0.0, 0.0, -res, float(np.min(x)) + origin[0], float(np.max(y)) + origin[1]])
+
+
+def write_world_file(path, values) -> str:
+    """Write a ``.jpw`` world file.
+
+    MATLAB's ``save -ascii`` keeps 8 significant digits, which rounds UTM
+    northings to about 0.1 m; this writes full precision instead.
+    """
+    with open(path, "w") as f:
+        f.write("".join(f"{v:.6f}\n" for v in values))
+    return str(path)
+
+
+def save_rectified(result: RectificationResult, jpg_path: str, mat_path: str = None,
+                   world: tuple = None):
+    """Write the plan image and a MATLAB-readable ``.mat`` (xgrid, ygrid, Iplan, metadata).
+
+    Pass ``world=(res, (origin_eastings, origin_northings))`` to also write the
+    ``.jpw`` world file next to the image, so GIS tools can place it.
+    """
     from PIL import Image
     from scipy.io import savemat
 
@@ -271,7 +303,27 @@ def save_rectified(result: RectificationResult, jpg_path: str, mat_path: str = N
         "xgrid": result.plan.x[None, :], "ygrid": result.plan.y[None, :],
         "Iplan": result.plan.timex, "metadata": result.metadata,
     }, do_compression=True)
+    if world is not None:
+        res, origin = world
+        write_world_file(os.path.splitext(jpg_path)[0] + ".jpw",
+                         world_file(result.plan.x, result.plan.y, res, origin))
     return jpg_path, mat_path
+
+
+class AccuracyError(ValueError):
+    """Raised when a GCP fit is worse than the site's "Acceptable Accuracy"."""
+
+
+def check_accuracy(geometry: Geometry, limit) -> None:
+    """Refuse a fit whose RMSE (pixels) exceeds the site DB ``rect.accuracylim``.
+
+    CSPGrectifyImage shows the RMSE and does not save the result in that case.
+    ``limit=None`` (not set in the DB) accepts any fit.
+    """
+    if limit is not None and geometry.rmse > float(limit):
+        raise AccuracyError(
+            f"RMSE {geometry.rmse:.1f} px is above the site limit of {float(limit):g} px; "
+            "the rectification was not saved. Re-pick the GCPs to reduce the error.")
 
 
 def load_geometry(mat_path: str, model: str = "analytic") -> tuple[np.ndarray, LensCalibration, dict]:
@@ -282,6 +334,18 @@ def load_geometry(mat_path: str, model: str = "analytic") -> tuple[np.ndarray, L
     md = loadmat(mat_path, simplify_cells=True)["metadata"]
     beta = np.asarray(md["geom"]["betas"], dtype=float).ravel()
     return beta, LensCalibration.from_matlab(md["geom"]["lcp"], model=model), md
+
+
+def virtual_gcp(u: float, v: float, geom: dict, origin, z: float = 0.0) -> np.ndarray:
+    """Real-world (UTM) point under image pixel (u, v) at elevation ``z``.
+
+    Port of CSPGgetVirtualGCP: ``geom`` is a rectified image's
+    ``metadata["geom"]`` and ``origin`` the site's (eastings, northings).
+    """
+    beta = np.asarray(geom["betas"], dtype=float).ravel()
+    lcp = LensCalibration.from_matlab(geom["lcp"])
+    xyz = find_xyz_6dof(np.atleast_1d(float(u)), np.atleast_1d(float(v)), z, beta, lcp)[0]
+    return np.array([xyz[0] + origin[0], xyz[1] + origin[1], z])
 
 
 def rectify_with_existing_geometry(I, mat_path: str, settings: RectificationSettings,
