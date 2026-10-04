@@ -4,13 +4,17 @@ This toolbox was written by Dr. Mitchell Harley at the University of New South W
 
 ## Getting Started
 
-1.  [Download the CoastSnap Starters Toolkit](https://unsw-my.sharepoint.com/:u:/g/personal/z2273773_ad_unsw_edu_au/Ed2R-hnWdytDm-Ya94DCG0MBUBJbiaGZkR5em16g8weODg?e=V10fsx) and unzip contents to your local directory. This directory will be your BASE_PATH (needed for step 3)
+1.  [Download the CoastSnap Starters Toolkit](https://unsw-my.sharepoint.com/:u:/g/personal/z2273773_ad_unsw_edu_au/EdgaW1h8u0NPh0u8lM1opi4Bb8gVSzVGAhtP4-Eg5jeNEQ?e=DIOUCG) and unzip contents to your local directory. This directory will be your BASE_PATH (needed for step 3)
 
 2.  Download the MATLAB files of this GitHub site to the CoastSnap/Code directory
 
-3.  Update the following two files to match your local setup: CSPsetPaths.m and CSPloadPaths.m
+3.  Make sure you have the following Matlab toolkits installed: mapping toolbox, Statistics and ML toolbox, Image processing toolbox and Curve Fitting Toolbox
+
+4.  Update the following two files to match your local setup: CSPsetPaths.m and CSPloadPaths.m
 
 Thats all - you should now be up and running
+
+For an indepth tutorial refer to the following video: https://www.youtube.com/watch?v=Al7vq26dlyk
 
 ## Demo using manly CoastSnap example
 

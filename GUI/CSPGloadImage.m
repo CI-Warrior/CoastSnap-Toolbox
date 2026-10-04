@@ -21,6 +21,11 @@ set(handles.oblq_image, 'UserData',data);
 if nargin==1 %If this is being called from the load image button
     [fname,pname]=uigetfile([data.path filesep '*.jpg'],'Select CoastSnap Image .jpg file from Processed Folder');
 end
+
+if isnumeric(fname)|isnumeric(pname)
+   data=[];
+   error('No file selected!!')
+end
 I = imread(fullfile(pname,fname)); %Read image
 disp('Image loaded to GUI')
 axes(handles.oblq_image) %Plot to oblq image axis
@@ -52,7 +57,12 @@ if exist(fullfile(rect_path,rect_name),'file')
     data_plan.Iplan = Iplan;
     data_plan.metadata = metadata;
     axes(handles.oblq_image) %Plot to oblq image axis
-    gcp_handle_oblq = plot(metadata.gcps.UVpicked(:,1),metadata.gcps.UVpicked(:,2),'go','markerfacecolor', 'g', 'markersize', 3);
+    if ~isnan(metadata.gcps.UVpicked) %If rectification was done using bulk mode, this is set to NaN
+        gcp_handle_oblq = plot(metadata.gcps.UVpicked(:,1),metadata.gcps.UVpicked(:,2),'go','markerfacecolor', 'g', 'markersize', 3);
+    else
+        gcp_handle_oblq =NaN;
+        disp('Image appears to have been rectified using bulk mapper. Manually-picked points will not be shown')
+    end
     data.gcp_handle_oblq = gcp_handle_oblq;
     set(handles.plan_image,'UserData',data_plan) %Store rectified info in userdata of plan_image
 end
@@ -62,13 +72,19 @@ sl_fname = strrep(fname,'snap','shoreline');
 sl_fname = strrep(sl_fname,'timex','shoreline'); %To deal with timex images as well
 sl_fname = strrep(sl_fname,'.jpg','.mat');
 if exist(fullfile(sldir,sl_fname),'file')
-    load(fullfile(sldir,sl_fname));
+    shoreline = load(fullfile(sldir,sl_fname));
     axes(handles.plan_image)
-    sl_handle_plan = plot(sl.xyz(:,1),sl.xyz(:,2),'y','linewidth',2);
+    if isfield(shoreline.sl,'QA')&&shoreline.sl.QA==0
+        sl_color = 'r'; %Make shoreline colour red if it is nonQA'd
+    else
+        sl_color = 'y';
+    end
+        
+    sl_handle_plan = plot(shoreline.sl.xyz(:,1),shoreline.sl.xyz(:,2),sl_color,'linewidth',2);
     axes(handles.oblq_image)
-    sl_handle_oblq = plot(sl.UV(:,1),sl.UV(:,2),'y','linewidth',2);
+    sl_handle_oblq = plot(shoreline.sl.UV(:,1),shoreline.sl.UV(:,2),sl_color,'linewidth',2);
     data_plan.sl_handle_plan = sl_handle_plan;
-    data_plan.sl = sl;
+    data_plan.sl = shoreline.sl;
     data.sl_handle_oblq = sl_handle_oblq;
     set(handles.plan_image,'UserData',data_plan) %Store rectified info in userdata of plan_image
 end

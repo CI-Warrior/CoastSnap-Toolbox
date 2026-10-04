@@ -1,3 +1,4 @@
+
 function out = CSPGrectifyImage(handles)
 
 data = get(handles.oblq_image,'UserData'); %Get data stored in the userdata in the oblq_image handles
@@ -166,6 +167,23 @@ if go==1 %If hasn't been previously rectified
     
     plot(UV_computed(:,1),UV_computed(:,2),'ro');
     
+    %Plot remaining GCPs to check accuracy
+    not_gcp_list = find(~ismember([1:length(siteDB.gcp)],gcp_list)); %Indices of gcps not used
+    if ~isempty(not_gcp_list)
+        gcp_not = siteDB.gcp(not_gcp_list);
+        for i = 1:length(gcp_not)
+            gcp_not(i).x = gcp_not(i).eastings - inputs.X0;
+            gcp_not(i).y = gcp_not(i).northings - inputs.Y0;
+        end
+        xyz_not = [[gcp_not.x]' [gcp_not.y]' [gcp_not.z]'];
+        UV_computed_not = findUVnDOF(betas(1,:), xyz_not, globs);
+        UV_computed_not = reshape(UV_computed_not,[],2);
+        plot(UV_computed_not(:,1),UV_computed_not(:,2),'m+');
+        for i = 1:length(gcp_not)
+            text(UV_computed_not(i,1),UV_computed_not(i,2),gcp_not(i).name);
+        end
+    end
+    
     %% Rectify image
     images.xy = inputs.rectxy;
     images.z = inputs.rectz;
@@ -194,13 +212,17 @@ if go==1 %If hasn't been previously rectified
     metadata.geom.knownFlags = globs.knownFlags;
     metadata.geom.knowns = globs.knowns;
     
-    if RMSE > 10
-        msgbox(['RMSE might be too large (' num2str(RMSE,'%0.1f') 'pixels) and hence result was not saved. Consider rectifying your image again. tor educe the error'])
+    if RMSE > siteDB.rect.accuracylim
+        msgbox(['RMSE might be too large (' num2str(RMSE,'%0.1f') 'pixels) and hence result was not saved. Consider rectifying your image again to reduce the error'])
     else
         %Save data to file
         imwrite(flipud(Iplan),fullfile(rect_path,rect_name))
         fname_rectified_mat = strrep(rect_name,'.jpg','.mat');
         save(fullfile(rect_path,fname_rectified_mat),'xgrid', 'ygrid', 'Iplan', 'metadata')
+        %Write world file
+        W = [siteDB.rect.res 0 0 -siteDB.rect.res min(xgrid)+siteDB.origin.eastings max(ygrid)+siteDB.origin.northings]'; %World file convention. Need to specify NW corner. 0 rotation as aligned N-S
+        fname_rectified_jpw = strrep(rect_name,'.jpg','.jpw');
+        save(fullfile(rect_path,fname_rectified_jpw),'W', '-ascii')
     end
         
     data.tide_level = tide_level;

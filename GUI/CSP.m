@@ -22,7 +22,7 @@ function varargout = CSP(varargin)
 
 % Edit the above text to modify the response to help CSP
 
-% Last Modified by GUIDE v2.5 26-May-2020 20:22:13
+% Last Modified by GUIDE v2.5 15-Apr-2023 12:15:51
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -300,7 +300,6 @@ function PlotShorelineChange_Callback(hObject, eventdata, handles)
 CSPGmakeShorelineChangePlot(handles)
 
 
-
 function previousshoreline_Callback(hObject, eventdata, handles)
 % hObject    handle to previousshoreline (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -369,7 +368,7 @@ function qashoreline_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-CSPGqaShoreline(handles)
+CSPGdeleteShoreline(handles)
 
 
 
@@ -388,3 +387,37 @@ function getVirtualGCP_Callback(hObject, eventdata, handles)
 
 CSPGgetVirtualGCP(handles)
 
+
+
+% --------------------------------------------------------------------
+function Menu_Advanced_Callback(hObject, eventdata, handles)
+% hObject    handle to Menu_Advanced (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --------------------------------------------------------------------
+function makeAnimation_Callback(hObject, eventdata, handles)
+% hObject    handle to makeAnimation (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+CSPGmakeBeachWidthAnimation(handles)
+
+
+% --------------------------------------------------------------------
+function make_transect_files_Callback(hObject, eventdata, handles)
+% hObject    handle to make_transect_files (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+CSPGmakeTransectFiles(handles)
+
+
+% --------------------------------------------------------------------
+function plotForecast_Callback(hObject, eventdata, handles)
+% hObject    handle to plotForecast (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+CSPGplotShorelineForecast(handles)

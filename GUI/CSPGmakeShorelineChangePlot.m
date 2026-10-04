@@ -54,10 +54,16 @@ sldir = fullfile(shoreline_path,imdata.site,imdata.year);
 slfile = strrep(navfiles(Icommon(Iprev)).name,'snap','shoreline');
 slfile = strrep(slfile,'timex','shoreline');
 slfile = strrep(slfile,'.jpg','.mat');
-load(fullfile(sldir,slfile));
+if exist(fullfile(sldir,slfile)) %Catch in case shoreline was mapped on registered image
+    load(fullfile(sldir,slfile));
+else
+    slfile = strrep(slfile,'.mat','_registered.mat');
+    load(fullfile(sldir,slfile));
+end
+%load(fullfile(sldir,slfile));
 UV = findUVnDOF(metadata.geom.betas,sl.xyz,metadata.geom);
 UV = reshape(UV,length(sl.xyz),2);
-plot(UV(:,1),UV(:,2),'linewidth',1,'color',colors(1,:))
+plot(UV(:,1),UV(:,2),'linewidth',1.5,'color',colors(1,:))
 for j = 1:length(transect_nos)
     [x_int,y_int] = polyxpoly(sl.xyz(:,1),sl.xyz(:,2),SLtransects.x(:,transect_nos(j)),SLtransects.y(:,transect_nos(j)));
     if ~isempty(x_int)
@@ -67,7 +73,8 @@ for j = 1:length(transect_nos)
     end
 end
 %Tidally-correct data
-bw_corr = (data.tide_level-sl.xyz(1,3))/slope;
+%bw_corr = (data.tide_level-sl.xyz(1,3))/slope;
+bw_corr = (0-sl.xyz(1,3))/slope; %Now use MSL to keep it consistent
 p(1,:) = p(1,:)-bw_corr;
 
 %Now do present shoreline
@@ -80,7 +87,7 @@ slfile = strrep(slfile,'.jpg','.mat');
 load(fullfile(sldir,slfile));
 UV = findUVnDOF(metadata.geom.betas,sl.xyz,metadata.geom);
 UV = reshape(UV,length(sl.xyz),2);
-plot(UV(:,1),UV(:,2),'linewidth',1,'color',colors(2,:))
+plot(UV(:,1),UV(:,2),'linewidth',1.5,'color',colors(2,:))
 for j = 1:length(transect_nos)
     [x_int,y_int] = polyxpoly(sl.xyz(:,1),sl.xyz(:,2),SLtransects.x(:,transect_nos(j)),SLtransects.y(:,transect_nos(j)));
     if ~isempty(x_int)
@@ -99,11 +106,12 @@ for j = 1:length(transect_nos)
     end
 end
 %Tidally-correct data
-bw_corr = (data.tide_level-sl.xyz(1,3))/slope;
+%bw_corr = (data.tide_level-sl.xyz(1,3))/slope;
+bw_corr = (0-sl.xyz(1,3))/slope; %Now use MSL to keep it consistent
 p(2,:) = p(2,:)-bw_corr;
 
 h = legend(imtimes,'location','NorthEast');
-h.FontSize = 8;
+h.FontSize = 10;
 
     
 %Plot time-series below

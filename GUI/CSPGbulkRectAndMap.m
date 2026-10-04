@@ -35,6 +35,10 @@ else
             newfname = data.navigation.files(II(i)).name;
             newpname = data.navigation.paths(II(i)).name;
             I = imread(fullfile(newpname,newfname)); %Read image
+            if i== 1
+                ImSizeCheck = [size(I,1) size(I,2)]; %To check that all images are the same size
+            end
+            ImSize = [size(I,1) size(I,2)];
             fileparts = CSPparseFilename(newfname);
             rect_path = strrep(newpname,'Processed','Rectified');
             rect_path = strrep(rect_path,'Registered','Rectified'); %For images coming from registered folder
@@ -42,6 +46,9 @@ else
             rect_name = strrep(rect_name,'timex','plan'); %For timex images
             if exist(fullfile(rect_path,rect_name),'file')
                 disp('Rectification already detected...skipping this image')
+                continue
+            elseif (ImSize(1)~=ImSizeCheck(1))||(ImSize(2)~=ImSizeCheck(2))
+                disp(['Warning: wrong image size detected in image ' newfname '. Check your registered images'])
                 continue
             end
             
@@ -94,14 +101,14 @@ else
             sl = out;
             
             %% Plot results
-            if i==1
+            if ~exist('newfig')
                 newfig = figure; %pop up new figure
             else
                 figure(newfig)
             end
             axheight = 10;
             width1 = axheight*size(I,2)/size(I,1); %Width of oblique image
-            width2 = axheight*(siteDB.rect.xlim(2)-siteDB.rect.xlim(1))/(siteDB.rect.ylim(2)-siteDB.rect.xlim(1)); %Width of rectified image
+            width2 = axheight*(siteDB.rect.xlim(2)-siteDB.rect.xlim(1))/(siteDB.rect.ylim(2)-siteDB.rect.ylim(1)); %Width of rectified image
             ver_mar = [0.5 0.5];
             hor_mar = [0.5 0.5];
             mid_mar = [0.5 0.5];
@@ -125,10 +132,18 @@ else
             %pause(0.3)
                       
             
-            %%Save data to file
-            %imwrite(flipud(Iplan),fullfile(rect_path,rect_name))
-            %fname_rectified_mat = strrep(rect_name,'.jpg','.mat');
-            %save(fullfile(rect_path,fname_rectified_mat),'xgrid', 'ygrid', 'Iplan', 'metadata')
+            %%Save rectified data to file
+            imwrite(flipud(Iplan),fullfile(rect_path,rect_name))
+            fname_rectified_mat = strrep(rect_name,'.jpg','.mat');
+            save(fullfile(rect_path,fname_rectified_mat),'xgrid', 'ygrid', 'Iplan', 'metadata')
+            
+            %Save shoreline to file
+            savedir = [shoreline_path filesep fileparts.site filesep fileparts.year filesep];
+            savefname = strrep(newfname,'snap','shoreline');
+            savefname = strrep(savefname,'timex','shoreline');
+            savefname = strrep(savefname,'.jpg','.mat');
+            save(fullfile(savedir,savefname),'sl')
+            disp('Shoreline saved to DB!')
         end     
     end
 end
