@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "coastsnap"
+version = "0.1.0"
+description = "Python port of the CoastSnap Community Beach Monitoring Toolbox"
+readme = "README.md"
+license = { text = "GPL-3.0-only" }
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.22",
+    "scipy>=1.10",
+    "pillow>=9.4",
+    "matplotlib>=3.7",
+    "openpyxl>=3",
+    "tomli>=1; python_version<'3.11'",
+]
+
+[project.optional-dependencies]
+db = ["openpyxl>=3"]
+test = ["pytest>=7", "openpyxl>=3"]
+
+[project.scripts]
+coastsnap = "coastsnap.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["coastsnap*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
