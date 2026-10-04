@@ -129,3 +129,14 @@ def find_xyz_6dof(u, v, z, beta, lcp: LensCalibration) -> np.ndarray:
     uu, vu = undistort(u, v, lcp)
     m = P2m(lcp_beta2P(lcp, beta))
     return find_xyz(m, np.column_stack([uu, vu]), z, 3)
+
+
+def make_uv_projector(geom: dict, model: str = "analytic"):
+    """A ``project_uv(xyz) -> (N, 2)`` callable from a saved ``metadata["geom"]``.
+
+    ``geom`` is the struct CSPGrectifyImage saves (``betas`` and ``lcp``), as
+    loaded with ``scipy.io.loadmat(..., simplify_cells=True)``.
+    """
+    beta = np.asarray(geom["betas"], dtype=float).ravel()
+    lcp = LensCalibration.from_matlab(geom["lcp"], model=model)
+    return lambda xyz: find_uv(beta, xyz, lcp)

@@ -45,7 +45,7 @@ All new images from various the sources (e.g. Instagram, Facebook, Email) are to
 The `coastsnap` Python package is a port of this toolbox. So far it covers image rectification: the camera model and lens distortion from `rectifyCode/`, the GCP solve with the FOV sweep from `CSPGrectifyImage`, and plan-view products from `buildRectProducts`/`makeFinalImages`.
 
 ```bash
-pip install -e ".[db,gui,test]"
+pip install -e ".[db,test]"
 pytest
 ```
 

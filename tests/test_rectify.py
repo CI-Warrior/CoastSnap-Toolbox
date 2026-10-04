@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from scipy.io import loadmat
 
-from coastsnap.camera import find_uv, find_xyz_6dof, make_lcp
+from coastsnap.camera import find_uv, find_xyz_6dof, make_lcp, make_uv_projector
 from coastsnap.db import read_site_db
 from coastsnap.rectify import (RectificationSettings, load_geometry, matlab_colon,
                                matlab_round, rectified_paths, rectify_from_gcps,
@@ -110,6 +110,9 @@ def test_full_workflow_and_mat_round_trip(site, tmp_path):
     b, lcp, _ = load_geometry(mat)
     np.testing.assert_allclose(b, res.geometry.beta)
     assert lcp == res.geometry.lcp
+    project = make_uv_projector(m["metadata"]["geom"])
+    np.testing.assert_allclose(project(s.gcp_xyz()),
+                               find_uv(res.geometry.beta, s.gcp_xyz(), res.geometry.lcp))
     again = rectify_with_existing_geometry(img, mat, s, tide)
     np.testing.assert_array_equal(again.timex, res.plan.timex)
 
